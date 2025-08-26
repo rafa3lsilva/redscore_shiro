@@ -1,14 +1,14 @@
-# services.py (VERSÃO FINAL USANDO A LÓGICA DO SEU TXT)
 import pandas as pd
 import streamlit as st
 import re
 import datetime
 
-
-def extrair_jogos_do_txt(texto_completo: str) -> pd.DataFrame:
+#--------------------------
+# FUNÇÃO PARA EXTRAIR JOGOS 
+#--------------------------
+def extrair_jogos(texto_completo: str) -> pd.DataFrame:
     """
-    Esta é a sua função original, adaptada para o nosso aplicativo.
-    Ela é a correta para ler os dados do arquivo .txt.
+    Esta é a sua função que ler os dados colados e faz a extração dos jogos.
     """
     linhas = texto_completo.strip().splitlines()
     if not linhas:
@@ -31,7 +31,6 @@ def extrair_jogos_do_txt(texto_completo: str) -> pd.DataFrame:
                 data_formatada = f"{data_str}-{ano_atual}"
                 liga = re.sub(padrao_data_liga, '', linha_atual).strip()
 
-                # A estrutura do .txt é fixa e previsível
                 # O nome do time se repete, pegamos a segunda instância
                 home = linhas[i+2].strip()
                 placar_ft_raw = linhas[i+3].strip()
@@ -79,7 +78,9 @@ def extrair_jogos_do_txt(texto_completo: str) -> pd.DataFrame:
 
     return df
 
-
+#--------------------------
+# FUNÇÃO PARA PROCESSAR DADOS E IDENTIFICAR TIMES
+#--------------------------
 def processar_dados_e_identificar_times(texto_completo: str):
     """
     Função principal que identifica os times e depois chama a extração correta para o formato .txt.
@@ -98,7 +99,7 @@ def processar_dados_e_identificar_times(texto_completo: str):
     home_team = nomes_times[0].strip()
     away_team = nomes_times[1].strip()
 
-    df_jogos = extrair_jogos_do_txt(texto_completo)
+    df_jogos = extrair_jogos(texto_completo)
 
     if df_jogos.empty:
         st.warning("Os times foram identificados, mas nenhum jogo pôde ser extraído. Verifique se o texto colado tem a mesma estrutura do arquivo .txt.")
