@@ -46,7 +46,32 @@ if texto_colado:
 
     # 1. Cria um identificador único para o confronto atual (ex: "Kalmar-vs-Helsingborg")
     confronto_atual = f"{home_team}-vs-{away_team}"
+    col1, col_vs, col2 = st.columns([5, 1, 5])
 
+    with col1:
+        st.markdown(f"""
+        <div style="background-color: #1f77b4; border-radius: 10px; padding: 25px; text-align: center; color: white; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);">
+            <h3 style="margin: 0;">🏠 {home_team}</h3>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_vs:
+        st.markdown(f"""
+        <div style="text-align: center; padding-top: 30px;">
+            <p style="font-size: 28px; font-weight: bold; color: #888;">VS</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div style="background-color: #d62728; border-radius: 10px; padding: 25px; text-align: center; color: white; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);">
+            <h3 style="margin: 0;">{away_team} ✈️</h3>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Adiciona um espaço depois
+    st.markdown("<br>", unsafe_allow_html=True)
+  
     # 2. Verifica se a mensagem para este confronto ainda NÃO foi exibida
     if st.session_state.ultimo_confronto_notificado != confronto_atual:
         # Se não foi, exibe o toast (a notificação pop-up)
@@ -55,7 +80,7 @@ if texto_colado:
 
         # E salva na "memória" que a notificação para este confronto já foi feita
         st.session_state.ultimo_confronto_notificado = confronto_atual
-
+        
 
     # A análise só começa se os times forem encontrados e os dados extraídos
     if home_team and away_team and not df_jogos.empty:
