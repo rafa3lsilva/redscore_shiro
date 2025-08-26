@@ -23,6 +23,9 @@ st.set_page_config(
 if "saved_analyses" not in st.session_state:
     st.session_state.saved_analyses = []
 
+if "ultimo_confronto_notificado" not in st.session_state:
+    st.session_state.ultimo_confronto_notificado = None
+
 # ----------------------------
 # INTERFACE
 # ----------------------------
@@ -41,40 +44,21 @@ if texto_colado:
         home_team, away_team, df_jogos = sv.processar_dados_e_identificar_times(
             texto_colado)
 
+    # 1. Cria um identificador único para o confronto atual (ex: "Kalmar-vs-Helsingborg")
+    confronto_atual = f"{home_team}-vs-{away_team}"
+
+    # 2. Verifica se a mensagem para este confronto ainda NÃO foi exibida
+    if st.session_state.ultimo_confronto_notificado != confronto_atual:
+        # Se não foi, exibe o toast (a notificação pop-up)
+        st.toast(
+            f"Análise carregada: 🏠 {home_team} vs ✈️ {away_team}", icon="📊")
+
+        # E salva na "memória" que a notificação para este confronto já foi feita
+        st.session_state.ultimo_confronto_notificado = confronto_atual
+
+
     # A análise só começa se os times forem encontrados e os dados extraídos
     if home_team and away_team and not df_jogos.empty:
-
-        st.toast(f"Times identificados: 🏠 {home_team} vs ✈️ {away_team}")
-       # Substitua o st.markdown original por este bloco
-        # Substitua o st.markdown original por este bloco
-        col1, col_vs, col2 = st.columns([5, 1, 5])
-
-        with col1:
-            st.markdown(f"""
-            <div style="background-color: #1f77b4; border-radius: 10px; padding: 25px; text-align: center; color: white; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);">
-                <h3 style="margin: 0;">🏠 {home_team}</h3>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col_vs:
-            st.markdown(f"""
-            <div style="text-align: center; padding-top: 30px;">
-                <p style="font-size: 28px; font-weight: bold; color: #888;">VS</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col2:
-            st.markdown(f"""
-            <div style="background-color: #d62728; border-radius: 10px; padding: 25px; text-align: center; color: white; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);">
-                <h3 style="margin: 0;">{away_team} ✈️</h3>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)  # Adiciona um espaço depois
-        st.markdown("---")
-
-        # CORREÇÃO: Todo o código de análise foi movido para dentro deste bloco 'if'.
-
         # ----------------------------
         # DEFINIÇÃO DOS PARÂMETROS DE ANÁLISE
         # ----------------------------
@@ -109,8 +93,6 @@ if texto_colado:
                                           "Últimos 8 jogos", "Últimos 10 jogos"], index=1, horizontal=True)
         num_jogos_selecionado = int(intervalo.split()[1])
 
-        # CORREÇÃO: Bloco de código redundante foi removido daqui.
-
         # Ajusta o número de jogos se o usuário pedir mais do que o disponível
         num_jogos_home = min(num_jogos_selecionado, len(df_home_base))
         num_jogos_away = min(num_jogos_selecionado, len(df_away_base))
@@ -142,7 +124,6 @@ if texto_colado:
             st.warning(f"⚠️ {analise['erro']}")
             st.stop()
 
-        # ... (O resto do seu código de análise e exibição de resultados vem aqui, já está correto)
         # Resultado 1X2
         st.markdown(f"#### 📊 Cenário da Partida ({analise['cenario_usado']})")
         col1, col2, col3 = st.columns(3)
@@ -160,7 +141,7 @@ if texto_colado:
         col1.markdown(f"✅ BTTS Sim: **{analise['btts']['p_btts_sim']}%**")
         col2.markdown(f"❌ BTTS Não: **{analise['btts']['p_btts_nao']}%**")
 
-        # CARD DE VENCEDOR e todo o resto... (a lógica interna está ok)
+        # CARD DE VENCEDOR 
 
         resultados = dt.prever_gols(home_team, away_team, df_jogos,
                                     num_jogos=num_jogos_selecionado,
@@ -181,7 +162,6 @@ if texto_colado:
         vw.card_vencedor(vencedor_nome=vencedor,
                          home_team_nome=home_team, away_team_nome=away_team)
 
-        # ... (o resto do código de exibição continua aqui sem alterações)
         st.markdown("### Análise para mercados complementares")
         st.markdown("### 🔮 Top 5 Placares Mais Prováveis")
         if analise.get("placares_top"):
@@ -476,7 +456,6 @@ if st.sidebar.button("💾 Salvar Análise Atual"):
 
     # 2. Monta dicionário da análise
     current_analysis = {
-        #"Liga": selected_league,
         "Home": home_team,
         "Away": away_team,
         "Cenário": selected_scenario,
