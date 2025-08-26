@@ -1,4 +1,3 @@
-# sidebar.py
 import streamlit as st
 
 def sidebar():
@@ -22,8 +21,5 @@ def entrada_de_dados_principal():
     Cria uma única área de texto na barra lateral para colar todos os dados.
     """
     st.sidebar.markdown("### 📥 Cole os Dados da Análise")
-    texto_completo = st.sidebar.text_area(
-        "Cole aqui os dados dos dois times (ex: KALMAR LAST 30 MATCHES...)",
-        height=250
-    )
+    texto_completo = st.sidebar.text_area("", height=150)
     return texto_completo
