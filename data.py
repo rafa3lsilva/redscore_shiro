@@ -1,4 +1,3 @@
-# data.py (CORRIGIDO)
 import pandas as pd
 from scipy.stats import poisson, nbinom
 import numpy as np
@@ -232,8 +231,7 @@ def prever_gols(home: str, away: str, df: pd.DataFrame, num_jogos: int = 6,
     """
     Previsão de gols com Poisson ajustada.
     """
-    # CORREÇÃO: Trocado .tail() por .head() para pegar os jogos mais recentes,
-    # já que o DataFrame principal (df) é passado ordenado de forma decrescente.
+
     if scenario == "Casa/Fora":
         df_home = df[df["Home"] == home].head(num_jogos)
         df_away = df[df["Away"] == away].head(num_jogos)
@@ -372,7 +370,7 @@ def prever_gol_ht(
     home: str, away: str, df: pd.DataFrame, num_jogos: int = 6,
     min_jogos: int = 3, scenario: str = "Casa/Fora", max_gols_ht: int = 3,
 ):
-    # CORREÇÃO: Trocado .tail() por .head()
+
     if scenario == "Casa/Fora":
         df_home = df[df["Home"] == home].head(num_jogos)
         df_away = df[df["Away"] == away].head(num_jogos)
@@ -428,7 +426,7 @@ def prever_escanteios_nb(
     home: str, away: str, df: pd.DataFrame, num_jogos: int = 6,
     scenario: str = "Casa/Fora", max_cantos: int = 20,
 ):
-    # CORREÇÃO: Trocado .tail() por .head()
+
     if scenario == "Casa/Fora":
         h = df[df["Home"] == home].head(num_jogos)
         a = df[df["Away"] == away].head(num_jogos)
