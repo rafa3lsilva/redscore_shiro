@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-from datetime import datetime
-import data as dt
 
 # ----------------------------
 # TÍTULO PRINCIPAL
@@ -14,29 +12,6 @@ def titulo_principal():
         <p style="font-size:18px; color:gray;">Probabilidades, Over/Under, BTTS e Escanteios</p>
     </div>
     """, unsafe_allow_html=True)
-
-# ----------------------------
-# STATUS DE CARREGAMENTO
-# ----------------------------
-def mostrar_status_carregamento(df_proximos: pd.DataFrame, dia_br: str, dia_iso: str):
-    """Mostra mensagens automáticas de acordo com a data escolhida e disponibilidade dos jogos."""
-    hoje_iso = datetime.today().strftime("%Y-%m-%d")
-
-    if df_proximos.empty:
-        if dia_iso > hoje_iso:
-            st.info(f"Jogos do dia {dia_br} ainda não estão disponíveis. ⏳")
-        elif dia_iso < hoje_iso:
-            st.info(f"Não existem dados para os jogos de {dia_br}. ℹ️")
-        else:
-            st.info(f"Nenhum jogo disponível para hoje ({dia_br}).")
-    else:
-        if dia_iso == hoje_iso:
-            if "msg_carregada" not in st.session_state or st.session_state.msg_carregada != dia_iso:
-                st.toast(
-                    f"Jogos de hoje ({dia_br}) carregados com sucesso! ✅", icon="✅")
-                st.session_state.msg_carregada = dia_iso
-        else:
-            st.toast(f"Jogos de {dia_br} carregados com sucesso! ✅")
 
 # ----------------------------
 # ESTILO INTERVALO DE JOGOS
