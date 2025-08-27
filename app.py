@@ -34,58 +34,56 @@ sb.sidebar()
 vw.configurar_estilo_intervalo_jogos()
 
 # ----------------------------
-# CARREGAMENTO DE DADOS (NOVA LÓGICA AUTOMÁTICA)
+# CARREGAMENTO DE DADOS E PROCESSAMENTO
 # ----------------------------
 texto_colado = sb.entrada_de_dados_principal()
 
 if texto_colado:
 
     with st.spinner("🕵️ Identificando times e processando dados..."):
-        home_team, away_team, df_jogos = sv.processar_dados_e_identificar_times(
+        # CORREÇÃO 1: Receber os 4 itens que a função retorna.
+        # As variáveis df_home_base e df_away_base já contêm os jogos corretos e separados.
+        home_team, away_team, df_home_base, df_away_base = sv.processar_dados_e_identificar_times(
             texto_colado)
 
-    # 1. Cria um identificador único para o confronto atual (ex: "Kalmar-vs-Helsingborg")
-    confronto_atual = f"{home_team}-vs-{away_team}"
-    col1, col_vs, col2 = st.columns([5, 1, 5])
+    # A análise só começa DEPOIS que confirmamos que tudo foi extraído corretamente
+    if home_team and away_team and not df_home_base.empty and not df_away_base.empty:
 
-    with col1:
-        st.markdown(f"""
-        <div style="background-color: #1f77b4; border-radius: 10px; padding: 25px; text-align: center; color: white; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);">
-            <h3 style="margin: 0;">🏠 {home_team}</h3>
-        </div>
-        """, unsafe_allow_html=True)
+        # CORREÇÃO 2: A exibição do cabeçalho e da notificação vem AQUI DENTRO.
+        confronto_atual = f"{home_team}-vs-{away_team}"
+        if st.session_state.get("ultimo_confronto_notificado") != confronto_atual:
+            st.toast(
+                f"Análise carregada: 🏠 {home_team} vs ✈️ {away_team}", icon="📊")
+            st.session_state.ultimo_confronto_notificado = confronto_atual
 
-    with col_vs:
-        st.markdown(f"""
-        <div style="text-align: center; padding-top: 30px;">
-            <p style="font-size: 28px; font-weight: bold; color: #888;">VS</p>
-        </div>
-        """, unsafe_allow_html=True)
+        # Exibe o cabeçalho do confronto
+        col1, col_vs, col2 = st.columns([5, 1, 5])
+        with col1:
+            st.markdown(f"""
+            <div style="background-color: #1f77b4; border-radius: 10px; padding: 25px; text-align: center; color: white; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);">
+                <h3 style="margin: 0;">🏠 {home_team}</h3>
+            </div>
+            """, unsafe_allow_html=True)
+        with col_vs:
+            st.markdown(f"""
+            <div style="text-align: center; padding-top: 30px;">
+                <p style="font-size: 28px; font-weight: bold; color: #888;">VS</p>
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"""
+            <div style="background-color: #d62728; border-radius: 10px; padding: 25px; text-align: center; color: white; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);">
+                <h3 style="margin: 0;">{away_team} ✈️</h3>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
 
-    with col2:
-        st.markdown(f"""
-        <div style="background-color: #d62728; border-radius: 10px; padding: 25px; text-align: center; color: white; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);">
-            <h3 style="margin: 0;">{away_team} ✈️</h3>
-        </div>
-        """, unsafe_allow_html=True)
+        # Junta os dois DataFrames para as análises que precisam da base completa
+        df_jogos = pd.concat([df_home_base, df_away_base],
+                             ignore_index=True).drop_duplicates()
 
-    # Adiciona um espaço depois
-    st.markdown("<br>", unsafe_allow_html=True)
-  
-    # 2. Verifica se a mensagem para este confronto ainda NÃO foi exibida
-    if st.session_state.ultimo_confronto_notificado != confronto_atual:
-        # Se não foi, exibe o toast (a notificação pop-up)
-        st.toast(
-            f"Análise carregada: 🏠 {home_team} vs ✈️ {away_team}", icon="📊")
-
-        # E salva na "memória" que a notificação para este confronto já foi feita
-        st.session_state.ultimo_confronto_notificado = confronto_atual
-        
-
-    # A análise só começa se os times forem encontrados e os dados extraídos
-    if home_team and away_team and not df_jogos.empty:
         # ----------------------------
-        # DEFINIÇÃO DOS PARÂMETROS DE ANÁLISE
+        # DEFINIÇÃO DOS PARÂMETROS DE ANÁLISE (agora na ordem correta)
         # ----------------------------
         st.sidebar.markdown("### ⚙️ Parâmetros da Análise")
         selected_scenario = st.sidebar.selectbox(
@@ -94,37 +92,26 @@ if texto_colado:
             help="Geral: todos os jogos. Casa/Fora: só jogos em casa do mandante e fora do visitante."
         )
 
-        # Define bases de dados de acordo com cenário
-        if selected_scenario == 'Geral':
-            df_home_base = df_jogos[(df_jogos['Home'].str.strip() == home_team) | (
-                df_jogos['Away'].str.strip() == home_team)].copy()
-            df_away_base = df_jogos[(df_jogos['Home'].str.strip() == away_team) | (
-                df_jogos['Away'].str.strip() == away_team)].copy()
-        else:  # Cenário 'Casa/Fora'
-            df_home_base = df_jogos[df_jogos['Home'].str.strip()
-                                    == home_team].copy()
-            df_away_base = df_jogos[df_jogos['Away'].str.strip()
-                                    == away_team].copy()
-
-        # Ordenar para pegar os mais recentes
-        df_home_base = df_home_base.sort_values(by='Data', ascending=False)
-        df_away_base = df_away_base.sort_values(by='Data', ascending=False)
-
-        # ----------------------------
-        # INTERVALO DE JOGOS
-        # ----------------------------
         st.markdown("### 📅 Intervalo de Jogos")
         intervalo = st.radio("", options=["Últimos 5 jogos", "Últimos 6 jogos",
                                           "Últimos 8 jogos", "Últimos 10 jogos"], index=1, horizontal=True)
         num_jogos_selecionado = int(intervalo.split()[1])
 
-        # Ajusta o número de jogos se o usuário pedir mais do que o disponível
-        num_jogos_home = min(num_jogos_selecionado, len(df_home_base))
-        num_jogos_away = min(num_jogos_selecionado, len(df_away_base))
+        # CORREÇÃO 3: Lógica de filtragem simplificada que usa os DFs corretos
+        temp_df_home = df_home_base.copy()
+        temp_df_away = df_away_base.copy()
 
-        # Pega os N primeiros jogos (os mais recentes) para a análise final
-        df_home = df_home_base.head(num_jogos_home)
-        df_away = df_away_base.head(num_jogos_away)
+        if selected_scenario == 'Casa/Fora':
+            # Filtra os jogos do time da casa para incluir apenas os que ele jogou em casa
+            temp_df_home = temp_df_home[temp_df_home['Home'].str.contains(
+                home_team.split()[0])]
+            # Filtra os jogos do time visitante para incluir apenas os que ele jogou fora
+            temp_df_away = temp_df_away[temp_df_away['Away'].str.contains(
+                away_team.split()[0])]
+
+        # Pega os N primeiros jogos para a análise final
+        df_home = temp_df_home.head(num_jogos_selecionado)
+        df_away = temp_df_away.head(num_jogos_selecionado)
         st.markdown("---")
 
         # ----------------------------
@@ -199,268 +186,268 @@ if texto_colado:
                 "⚠️ Sem dados suficientes para estimar placares prováveis.")
 
         # Analise de gol HT
-    st.markdown("## 🕐 Gol no 1º Tempo")
-    # 🎯 Modelo probabilístico (Poisson)
-    ht = dt.prever_gol_ht(
-        home_team, away_team, df_jogos,
-        num_jogos=num_jogos_selecionado,
-        scenario=selected_scenario
-    )
-    st.markdown(f"### Probabilidades com base no Modelo Poisson")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"- Over 0.5 HT: **{ht['p_gol_ht']}%**")
-    with col2:
-        st.markdown(f"- Exatamente 1 gol no HT: **{ht['p_exato1_ht']}%**")
-
-    # Histórico de apoio
-    analise_ht_hist = dt.analise_gol_ht(df_home, df_away)
-    with st.expander("📋 Estatística de apoio para gols no 1º tempo, usando médias históricas com base nos últimos jogos"):
-        col1, col2, col3 = st.columns(3)
+        st.markdown("## 🕐 Gol no 1º Tempo")
+        # 🎯 Modelo probabilístico (Poisson)
+        ht = dt.prever_gol_ht(
+            home_team, away_team, df_jogos,
+            num_jogos=num_jogos_selecionado,
+            scenario=selected_scenario
+        )
+        st.markdown(f"### Probabilidades com base no Modelo Poisson")
+        col1, col2 = st.columns(2)
         with col1:
-            st.metric("Média Over 0.5 HT",
-                      f"{analise_ht_hist['media_05ht']:.1f}%")
+            st.markdown(f"- Over 0.5 HT: **{ht['p_gol_ht']}%**")
         with col2:
-            st.metric("Média Over 1.5 FT",
-                      f"{analise_ht_hist['media_15ft']:.1f}%")
-        with col3:
-            st.metric("Média Over 2.5 FT",
-                      f"{analise_ht_hist['media_25ft']:.1f}%")
+            st.markdown(f"- Exatamente 1 gol no HT: **{ht['p_exato1_ht']}%**")
 
-        # 1. Junta os dataframes de casa e fora para uma análise combinada
-        df_total_ht = pd.concat([df_home, df_away], ignore_index=True)
+        # Histórico de apoio
+        analise_ht_hist = dt.analise_gol_ht(df_home, df_away)
+        with st.expander("📋 Estatística de apoio para gols no 1º tempo, usando médias históricas com base nos últimos jogos"):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Média Over 0.5 HT",
+                        f"{analise_ht_hist['media_05ht']:.1f}%")
+            with col2:
+                st.metric("Média Over 1.5 FT",
+                        f"{analise_ht_hist['media_15ft']:.1f}%")
+            with col3:
+                st.metric("Média Over 2.5 FT",
+                        f"{analise_ht_hist['media_25ft']:.1f}%")
 
-        # 2. Chama a nova função que criámos em data.py
-        desvio_padrao_ht = dt.analisar_consistencia_gols_ht(df_total_ht)
+            # 1. Junta os dataframes de casa e fora para uma análise combinada
+            df_total_ht = pd.concat([df_home, df_away], ignore_index=True)
+
+            # 2. Chama a nova função que criámos em data.py
+            desvio_padrao_ht = dt.analisar_consistencia_gols_ht(df_total_ht)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Desvio Padrão dos Gols HT", f"{desvio_padrao_ht:.2f}")
+
+            with col2:
+                if desvio_padrao_ht == 0.0:
+                    interpretacao = "ℹ️ Dados insuficientes."
+                elif desvio_padrao_ht <= limite_consistente:
+                    interpretacao = "✅ **Cenário Consistente:** A quantidade de gols no HT nos jogos destas equipas tende a ser muito previsível."
+                elif desvio_padrao_ht <= limite_imprevisivel:
+                    interpretacao = "⚠️ **Cenário Moderado:** Há alguma variação na quantidade de gols no HT, mas ainda com alguma previsibilidade."
+                else:
+                    interpretacao = "🚨 **Cenário Imprevisível:** A quantidade de gols no HT varia muito de jogo para jogo. É um cenário de 'altos e baixos'."
+
+                st.info(interpretacao)
+
+            # Análise de Gol no Primeiro Tempo (HT)
+            analise_ht = dt.analisar_gol_ht_home_away(df_home, df_away)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**Análise de {home_team}:**")
+                st.info(
+                    f"Marcou gol no HT em **{analise_ht['home_marca']:.1f}%** dos seus jogos.")
+                st.warning(
+                    f"Sofreu gol no HT em **{analise_ht['home_sofre']:.1f}%** dos seus jogos.")
+
+            with col2:
+                st.markdown(f"**Análise de {away_team}:**")
+                st.info(
+                    f"Marcou gol no HT em **{analise_ht['away_marca']:.1f}%** dos seus jogos.")
+                st.warning(
+                    f"Sofreu gol no HT em **{analise_ht['away_sofre']:.1f}%** dos seus jogos.")
+
+        # --- MERCADO DE GOLS ---
+        st.markdown("## 🎯 Mercado de Gols (FT)")
+
+        # Probabilidades principais (Poisson)
+        st.sidebar.markdown(
+            "<h3 style='text-align: center;'>🎯 Linhas de Gols Over/Under</h3>", unsafe_allow_html=True)
+        linha_gols = st.sidebar.selectbox(
+            "Linha de Gols - Over/Under:",
+            [1.5, 2.5, 3.5],
+            index=1
+        )
+        over_under = dt.calcular_over_under(resultados, linha=linha_gols)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"- 🔼 Over {linha_gols}: **{over_under['p_over']}%**")
+        with col2:
+            st.markdown(f"- 🔽 Under {linha_gols}: **{over_under['p_under']}%**")
+
+        # --- Probabilidades por Mercado (Poisson) ---
+        linha_over15 = dt.calcular_over_under(resultados, linha=1.5)
+        linha_over25 = dt.calcular_over_under(resultados, linha=2.5)
+        linha_over35 = dt.calcular_over_under(resultados, linha=3.5)
+        btts = dt.calcular_btts(resultados) if resultados else {
+            "p_btts_sim": 0, "p_btts_nao": 0}
+
+        # Monta DataFrame direto do modelo Poisson
+        df_resultado_mercados = pd.DataFrame([
+            {"Mercado": "Over 1.5", "Probabilidade (%)": linha_over15['p_over'], "Odd Justa": round(
+                100/linha_over15['p_over'], 2)},
+            {"Mercado": "Over 2.5", "Probabilidade (%)": linha_over25['p_over'], "Odd Justa": round(
+                100/linha_over25['p_over'], 2)},
+            {"Mercado": "Over 3.5", "Probabilidade (%)": linha_over35['p_over'], "Odd Justa": round(
+                100/linha_over35['p_over'], 2)},
+            {"Mercado": "BTTS", "Probabilidade (%)": btts['p_btts_sim'], "Odd Justa": round(
+                100/btts['p_btts_sim'], 2)},
+        ])
+
+        st.subheader(
+            "Probabilidades por Mercado com Poisson e Comparador de Valor")
+
+        cols = st.columns(len(df_resultado_mercados))
+        for i, col in enumerate(cols):
+            with col:
+                mercado = df_resultado_mercados.iloc[i]
+                odd_justa_safe = mercado['Odd Justa'] if np.isfinite(
+                    mercado['Odd Justa']) else 1.0
+                st.metric(
+                    label=mercado["Mercado"],
+                    value=f'{mercado["Probabilidade (%)"]}%',
+                    delta=f'Odd Justa: {mercado["Odd Justa"]}'
+                )
+
+                odd_mercado = st.number_input(
+                    f"Odd Mercado para {mercado['Mercado']}",
+                    min_value=1.00,
+                    value=odd_justa_safe,
+                    step=0.01,
+                    format="%.2f",
+                    key=f"odd_mercado_{mercado['Mercado']}"
+                )
+
+                if odd_mercado > mercado['Odd Justa']:
+                    valor_ev = (odd_mercado / mercado['Odd Justa'] - 1) * 100
+                    st.success(f"✅ Valor Encontrado: +{valor_ev:.2f}%")
+                else:
+                    st.warning("Sem valor aparente.")
+
+        # Gráfico de barras para as probabilidades por mercado
+        with st.expander("📊 Gráfico de Probabilidades por Mercado"):
+            vw.grafico_mercados(df_resultado_mercados,
+                                titulo="Probabilidades (Poisson + BTTS)")
+
+        # Linhas Over/Under de Escanteios na sidebar
+        # A nova linha, com o texto centralizado
+        st.sidebar.markdown(
+            "<h3 style='text-align: center;'>📊 Linhas de Escanteios Over/Under</h3>", unsafe_allow_html=True)
+        linha_escanteios = st.sidebar.selectbox(
+            "Selecione a linha de escanteios:",
+            [6.5, 7.5, 8.5, 9.5, 10.5, 11.5],
+            index=3
+        )
+        st.session_state.linha_escanteios = linha_escanteios
+
+        # Calcula probabilidades de escanteios
+        cantos = dt.prever_escanteios_nb(home_team, away_team, df_jogos,
+                                        num_jogos=num_jogos_selecionado, scenario=selected_scenario)
+
+        # Probabilidades Over/Under
+        st.session_state.over_under_cantos = dt.calcular_over_under_cantos(
+            cantos, st.session_state.linha_escanteios)
+
+        # Quem tem mais cantos
+        mais_cantos = dt.prob_home_mais_cantos(cantos)
+
+        # --- ESCANTEIOS ---
+        st.markdown("## 🟦 Estimativa de Escanteios")
+
+        # 🎯 Modelo principal (NegBin)
+        cantos = dt.prever_escanteios_nb(
+            home_team, away_team, df_jogos,
+            num_jogos=num_jogos_selecionado,
+            scenario=selected_scenario
+        )
+        st.session_state.over_under_cantos = dt.calcular_over_under_cantos(
+            cantos, st.session_state.linha_escanteios
+        )
+        mais_cantos = dt.prob_home_mais_cantos(cantos)
+
+        st.markdown("### Probabilidades (Modelo NegBin)")
 
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Desvio Padrão dos Gols HT", f"{desvio_padrao_ht:.2f}")
-
+            st.markdown(
+                f"- Over {st.session_state.linha_escanteios}: **{st.session_state.over_under_cantos['p_over']}%**")
         with col2:
-            if desvio_padrao_ht == 0.0:
-                interpretacao = "ℹ️ Dados insuficientes."
-            elif desvio_padrao_ht <= limite_consistente:
-                interpretacao = "✅ **Cenário Consistente:** A quantidade de gols no HT nos jogos destas equipas tende a ser muito previsível."
-            elif desvio_padrao_ht <= limite_imprevisivel:
-                interpretacao = "⚠️ **Cenário Moderado:** Há alguma variação na quantidade de gols no HT, mas ainda com alguma previsibilidade."
-            else:
-                interpretacao = "🚨 **Cenário Imprevisível:** A quantidade de gols no HT varia muito de jogo para jogo. É um cenário de 'altos e baixos'."
-
-            st.info(interpretacao)
-
-        # Análise de Gol no Primeiro Tempo (HT)
-        analise_ht = dt.analisar_gol_ht_home_away(df_home, df_away)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**Análise de {home_team}:**")
-            st.info(
-                f"Marcou gol no HT em **{analise_ht['home_marca']:.1f}%** dos seus jogos.")
-            st.warning(
-                f"Sofreu gol no HT em **{analise_ht['home_sofre']:.1f}%** dos seus jogos.")
-
-        with col2:
-            st.markdown(f"**Análise de {away_team}:**")
-            st.info(
-                f"Marcou gol no HT em **{analise_ht['away_marca']:.1f}%** dos seus jogos.")
-            st.warning(
-                f"Sofreu gol no HT em **{analise_ht['away_sofre']:.1f}%** dos seus jogos.")
-
-    # --- MERCADO DE GOLS ---
-    st.markdown("## 🎯 Mercado de Gols (FT)")
-
-    # Probabilidades principais (Poisson)
-    st.sidebar.markdown(
-        "<h3 style='text-align: center;'>🎯 Linhas de Gols Over/Under</h3>", unsafe_allow_html=True)
-    linha_gols = st.sidebar.selectbox(
-        "Linha de Gols - Over/Under:",
-        [1.5, 2.5, 3.5],
-        index=1
-    )
-    over_under = dt.calcular_over_under(resultados, linha=linha_gols)
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"- 🔼 Over {linha_gols}: **{over_under['p_over']}%**")
-    with col2:
-        st.markdown(f"- 🔽 Under {linha_gols}: **{over_under['p_under']}%**")
-
-    # --- Probabilidades por Mercado (Poisson) ---
-    linha_over15 = dt.calcular_over_under(resultados, linha=1.5)
-    linha_over25 = dt.calcular_over_under(resultados, linha=2.5)
-    linha_over35 = dt.calcular_over_under(resultados, linha=3.5)
-    btts = dt.calcular_btts(resultados) if resultados else {
-        "p_btts_sim": 0, "p_btts_nao": 0}
-
-    # Monta DataFrame direto do modelo Poisson
-    df_resultado_mercados = pd.DataFrame([
-        {"Mercado": "Over 1.5", "Probabilidade (%)": linha_over15['p_over'], "Odd Justa": round(
-            100/linha_over15['p_over'], 2)},
-        {"Mercado": "Over 2.5", "Probabilidade (%)": linha_over25['p_over'], "Odd Justa": round(
-            100/linha_over25['p_over'], 2)},
-        {"Mercado": "Over 3.5", "Probabilidade (%)": linha_over35['p_over'], "Odd Justa": round(
-            100/linha_over35['p_over'], 2)},
-        {"Mercado": "BTTS", "Probabilidade (%)": btts['p_btts_sim'], "Odd Justa": round(
-            100/btts['p_btts_sim'], 2)},
-    ])
-
-    st.subheader(
-        "Probabilidades por Mercado com Poisson e Comparador de Valor")
-
-    cols = st.columns(len(df_resultado_mercados))
-    for i, col in enumerate(cols):
-        with col:
-            mercado = df_resultado_mercados.iloc[i]
-            odd_justa_safe = mercado['Odd Justa'] if np.isfinite(
-                mercado['Odd Justa']) else 1.0
-            st.metric(
-                label=mercado["Mercado"],
-                value=f'{mercado["Probabilidade (%)"]}%',
-                delta=f'Odd Justa: {mercado["Odd Justa"]}'
-            )
-
-            odd_mercado = st.number_input(
-                f"Odd Mercado para {mercado['Mercado']}",
-                min_value=1.00,
-                value=odd_justa_safe,
-                step=0.01,
-                format="%.2f",
-                key=f"odd_mercado_{mercado['Mercado']}"
-            )
-
-            if odd_mercado > mercado['Odd Justa']:
-                valor_ev = (odd_mercado / mercado['Odd Justa'] - 1) * 100
-                st.success(f"✅ Valor Encontrado: +{valor_ev:.2f}%")
-            else:
-                st.warning("Sem valor aparente.")
-
-    # Gráfico de barras para as probabilidades por mercado
-    with st.expander("📊 Gráfico de Probabilidades por Mercado"):
-        vw.grafico_mercados(df_resultado_mercados,
-                            titulo="Probabilidades (Poisson + BTTS)")
-
-    # Linhas Over/Under de Escanteios na sidebar
-    # A nova linha, com o texto centralizado
-    st.sidebar.markdown(
-        "<h3 style='text-align: center;'>📊 Linhas de Escanteios Over/Under</h3>", unsafe_allow_html=True)
-    linha_escanteios = st.sidebar.selectbox(
-        "Selecione a linha de escanteios:",
-        [6.5, 7.5, 8.5, 9.5, 10.5, 11.5],
-        index=3
-    )
-    st.session_state.linha_escanteios = linha_escanteios
-
-    # Calcula probabilidades de escanteios
-    cantos = dt.prever_escanteios_nb(home_team, away_team, df_jogos,
-                                     num_jogos=num_jogos_selecionado, scenario=selected_scenario)
-
-    # Probabilidades Over/Under
-    st.session_state.over_under_cantos = dt.calcular_over_under_cantos(
-        cantos, st.session_state.linha_escanteios)
-
-    # Quem tem mais cantos
-    mais_cantos = dt.prob_home_mais_cantos(cantos)
-
-    # --- ESCANTEIOS ---
-    st.markdown("## 🟦 Estimativa de Escanteios")
-
-    # 🎯 Modelo principal (NegBin)
-    cantos = dt.prever_escanteios_nb(
-        home_team, away_team, df_jogos,
-        num_jogos=num_jogos_selecionado,
-        scenario=selected_scenario
-    )
-    st.session_state.over_under_cantos = dt.calcular_over_under_cantos(
-        cantos, st.session_state.linha_escanteios
-    )
-    mais_cantos = dt.prob_home_mais_cantos(cantos)
-
-    st.markdown("### Probabilidades (Modelo NegBin)")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(
-            f"- Over {st.session_state.linha_escanteios}: **{st.session_state.over_under_cantos['p_over']}%**")
-    with col2:
-        st.markdown(
-            f"- Under {st.session_state.linha_escanteios}: **{st.session_state.over_under_cantos['p_under']}%**")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f"- 🏠 Home mais cantos: **{mais_cantos['home_mais']}%**")
-    with col2:
-        st.markdown(f"- 🤝 Empate em cantos: **{mais_cantos['empate']}%**")
-    with col3:
-        st.markdown(f"- ✈️ Away mais cantos: **{mais_cantos['away_mais']}%**")
-
-    # 📊 Apoio: médias históricas
-    resultado_escanteios = dt.estimar_linha_escanteios(
-        df_home, df_away, home_team, away_team)
-    with st.expander("📋 Estatísticas Históricas de Escanteios"):
+            st.markdown(
+                f"- Under {st.session_state.linha_escanteios}: **{st.session_state.over_under_cantos['p_under']}%**")
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Média Cantos Mandante",
-                      f"{resultado_escanteios['Escanteios Mandante']:.2f}")
+            st.markdown(f"- 🏠 Home mais cantos: **{mais_cantos['home_mais']}%**")
         with col2:
-            st.metric("Média Cantos Visitante",
-                      f"{resultado_escanteios['Escanteios Visitante']:.2f}")
+            st.markdown(f"- 🤝 Empate em cantos: **{mais_cantos['empate']}%**")
         with col3:
-            st.metric("Média Total de Cantos",
-                      f"{resultado_escanteios['Escanteios Totais Ajustados']:.2f}")
+            st.markdown(f"- ✈️ Away mais cantos: **{mais_cantos['away_mais']}%**")
 
-    # ----------------------------------------------------
-    # Apoio Estatístico com médias históricas estatísticas
-    # ----------------------------------------------------
-    st.markdown("### Apoio Estatístico")
+        # 📊 Apoio: médias históricas
+        resultado_escanteios = dt.estimar_linha_escanteios(
+            df_home, df_away, home_team, away_team)
+        with st.expander("📋 Estatísticas Históricas de Escanteios"):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Média Cantos Mandante",
+                        f"{resultado_escanteios['Escanteios Mandante']:.2f}")
+            with col2:
+                st.metric("Média Cantos Visitante",
+                        f"{resultado_escanteios['Escanteios Visitante']:.2f}")
+            with col3:
+                st.metric("Média Total de Cantos",
+                        f"{resultado_escanteios['Escanteios Totais Ajustados']:.2f}")
 
-    # Exibe as médias de gols
-    media_home_gols_marcados = dt.media_gols_marcados(df_home, home_team)
-    media_home_gols_sofridos = dt.media_gols_sofridos(df_home, home_team)
-    media_away_gols_marcados = dt.media_gols_marcados(df_away, away_team)
-    media_away_gols_sofridos = dt.media_gols_sofridos(df_away, away_team)
+        # ----------------------------------------------------
+        # Apoio Estatístico com médias históricas estatísticas
+        # ----------------------------------------------------
+        st.markdown("### Apoio Estatístico")
 
-    # Exibe as médias de gols
-    st.markdown("### 📋 Médias de Gols Home e Away", unsafe_allow_html=True)
-    vw.mostrar_cards_media_gols(
-        home_team,
-        away_team,
-        media_home_gols_marcados,
-        media_home_gols_sofridos,
-        media_away_gols_marcados,
-        media_away_gols_sofridos
-    )
-    # --- CÁLCULO E EXIBIÇÃO DE TENDÊNCIAS ---
-    st.markdown("### 📈 Tendências baseado nas Médias")
+        # Exibe as médias de gols
+        media_home_gols_marcados = dt.media_gols_marcados(df_home, home_team)
+        media_home_gols_sofridos = dt.media_gols_sofridos(df_home, home_team)
+        media_away_gols_marcados = dt.media_gols_marcados(df_away, away_team)
+        media_away_gols_sofridos = dt.media_gols_sofridos(df_away, away_team)
 
-    # 1. Chamar as novas funções que você adicionou em data.py
-    status_btts = dt.btts_status(
-        media_home_gols_marcados, media_away_gols_sofridos, media_away_gols_marcados, media_home_gols_sofridos)
-    status_over = dt.over_status(
-        media_home_gols_marcados, media_away_gols_sofridos, media_away_gols_marcados, media_home_gols_sofridos)
+        # Exibe as médias de gols
+        st.markdown("### 📋 Médias de Gols Home e Away", unsafe_allow_html=True)
+        vw.mostrar_cards_media_gols(
+            home_team,
+            away_team,
+            media_home_gols_marcados,
+            media_home_gols_sofridos,
+            media_away_gols_marcados,
+            media_away_gols_sofridos
+        )
+        # --- CÁLCULO E EXIBIÇÃO DE TENDÊNCIAS ---
+        st.markdown("### 📈 Tendências baseado nas Médias")
 
-    # 2. Exibir os resultados em colunas estilizadas
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"""
-        <div style='background-color:#262730; padding:15px; border-radius:8px; text-align:center; color:white; height: 100%;'>
-            <h4>Ambas Marcam (BTTS)</h4>
-            <p style='font-size: 24px; font-weight: bold;'>{status_btts}</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"""
-        <div style='background-color:#262730; padding:15px; border-radius:8px; text-align:center; color:white; height: 100%;'>
-            <h4>Over 2.5 Gols</h4>
-            <p style='font-size: 24px; font-weight: bold;'>{status_over}</p>
-        </div>
-        """, unsafe_allow_html=True)
-    st.markdown("---")
+        # 1. Chamar as novas funções que você adicionou em data.py
+        status_btts = dt.btts_status(
+            media_home_gols_marcados, media_away_gols_sofridos, media_away_gols_marcados, media_home_gols_sofridos)
+        status_over = dt.over_status(
+            media_home_gols_marcados, media_away_gols_sofridos, media_away_gols_marcados, media_home_gols_sofridos)
 
-    # Tabela de Jogos home e away
-    with st.expander("📋 Ver Últimos Jogos Analisados"):
-        vw.mostrar_tabela_jogos(df_home, home_team, "🏠")
-        vw.mostrar_tabela_jogos(df_away, away_team, "✈️")
+        # 2. Exibir os resultados em colunas estilizadas
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"""
+            <div style='background-color:#262730; padding:15px; border-radius:8px; text-align:center; color:white; height: 100%;'>
+                <h4>Ambas Marcam (BTTS)</h4>
+                <p style='font-size: 24px; font-weight: bold;'>{status_btts}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"""
+            <div style='background-color:#262730; padding:15px; border-radius:8px; text-align:center; color:white; height: 100%;'>
+                <h4>Over 2.5 Gols</h4>
+                <p style='font-size: 24px; font-weight: bold;'>{status_over}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("---")
 
-    # Botão para salvar análise atual
+        # Tabela de Jogos home e away
+        with st.expander("📋 Ver Últimos Jogos Analisados"):
+            vw.mostrar_tabela_jogos(df_home, home_team, "🏠")
+            vw.mostrar_tabela_jogos(df_away, away_team, "✈️")
+
+        # Botão para salvar análise atual
 if st.sidebar.button("💾 Salvar Análise Atual"):
     # 1. Extrai os dados dos mercados e escanteios
     prob_over_1_5 = df_resultado_mercados.loc[

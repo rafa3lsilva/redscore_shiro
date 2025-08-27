@@ -6,15 +6,21 @@ import datetime
 #--------------------------
 # FUNÇÃO PARA EXTRAIR JOGOS 
 #--------------------------
-def extrair_jogos(texto_completo: str) -> pd.DataFrame:
+
+
+def extrair_jogos_corrigida(texto_completo: str) -> pd.DataFrame:
     """
-    Esta é a sua função que ler os dados colados e faz a extração dos jogos.
+    Versão final e robusta que usa a linha de estatísticas como âncora e
+    torna a busca pelo cabeçalho opcional dentro de cada bloco de texto.
     """
     linhas = texto_completo.strip().splitlines()
+              
     if not linhas:
         return pd.DataFrame()
 
     jogos = []
+
+
     i = 0
     ano_atual = datetime.date.today().year
     padrao_data_liga = r'^\d{1,2}\.\d{1,2}\s+'
@@ -34,13 +40,13 @@ def extrair_jogos(texto_completo: str) -> pd.DataFrame:
                 # O nome do time se repete, pegamos a segunda instância
                 home = linhas[i+2].strip()
                 placar_ft_raw = linhas[i+3].strip()
-                away = linhas[i+5].strip()  # O nome do time se repete
+                away = linhas[i+4].strip()  # O nome do time se repete
                 stats_line = linhas[i+6].strip()
                 odds_line = linhas[i+7].strip()
 
                 placar_ft = re.search(r"(\d+)\s*-\s*(\d+)", placar_ft_raw)
                 estat = re.findall(r"\d+\s*-\s*\d+", stats_line)
-                #odds_match = re.findall(r"\d+\.\d+", odds_line)
+                # odds_match = re.findall(r"\d+\.\d+", odds_line)
 
                 # Verifica se todas as partes essenciais foram encontradas
                 if placar_ft and len(estat) >= 5 and len(estat) >= 3:
@@ -49,9 +55,9 @@ def extrair_jogos(texto_completo: str) -> pd.DataFrame:
                     chutes_gol = [int(x) for x in estat[2].split("-")]
                     ataques = [int(x) for x in estat[3].split("-")]
                     escanteios = [int(x) for x in estat[4].split("-")]
-                    #odds = [float(x) for x in odds_match]
+                    # odds = [float(x) for x in odds_match]
 
-                    jogos.append({
+                jogos.append({
                         "Data": data_formatada, "Liga": liga, "Home": home, "Away": away,
                         "H_Gols_FT": int(placar_ft.group(1)), "A_Gols_FT": int(placar_ft.group(2)),
                         "H_Gols_HT": placar_ht[0], "A_Gols_HT": placar_ht[1],
@@ -60,48 +66,52 @@ def extrair_jogos(texto_completo: str) -> pd.DataFrame:
                         "H_Ataques": ataques[0], "A_Ataques": ataques[1],
                         "H_Escanteios": escanteios[0], "A_Escanteios": escanteios[1],
                         #"Odd_H": odds[0], "Odd_D": odds[1], "Odd_A": odds[2]
-                    })
+                        })
                 i += 8  # Pula para o próximo bloco de jogo
-            except (ValueError, IndexError, TypeError):
-                i += 1
+            except (ValueError, IndexError, TypeError, AttributeError):
+                i += 1  # Se falhar, apenas avança uma linha    
                 continue
         else:
             i += 1
 
     df = pd.DataFrame(jogos)
     if not df.empty:
-        df = df.drop_duplicates().sort_values(
-            by="Data", ascending=False).reset_index(drop=True)
-        df['Data'] = pd.to_datetime(
-            df['Data'], format="%d-%m-%Y", errors="coerce").dt.date
-        df.dropna(subset=['Data'], inplace=True)
+        df = df.drop_duplicates().reset_index(drop=True)
 
     return df
 
-#--------------------------
-# FUNÇÃO PARA PROCESSAR DADOS E IDENTIFICAR TIMES
-#--------------------------
+
 def processar_dados_e_identificar_times(texto_completo: str):
     """
-    Função principal que identifica os times e depois chama a extração correta para o formato .txt.
+    Função principal que identifica os times, divide o texto em blocos
+    e extrai os jogos de cada bloco separadamente, retornando 4 itens.
     """
     if not texto_completo or texto_completo.isspace():
-        return None, None, pd.DataFrame()
+        return None, None, pd.DataFrame(), pd.DataFrame()
 
     regex_pattern = r'(.+?)\s+LAST\s+\d+\s+MATCHES'
-    nomes_times = re.findall(regex_pattern, texto_completo, re.IGNORECASE)
+    matches = list(re.finditer(regex_pattern, texto_completo, re.IGNORECASE))
 
-    if len(nomes_times) < 2:
+    if len(matches) < 2:
         st.error(
-            "Erro: Não foram encontrados os dois times com o padrão 'NOME DO TIME LAST 30 MATCHES' no texto.")
-        return None, None, pd.DataFrame()
+            "Erro: Não foram encontrados os dois blocos de times com o padrão 'NOME DO TIME LAST X MATCHES'.")
+        return None, None, pd.DataFrame(), pd.DataFrame()
 
-    home_team = nomes_times[0].strip()
-    away_team = nomes_times[1].strip()
+    home_team_official = matches[0].group(1).strip()
+    away_team_official = matches[1].group(1).strip()
 
-    df_jogos = extrair_jogos(texto_completo)
+    start_block_home = matches[0].end()
+    start_block_away = matches[1].end()
 
-    if df_jogos.empty:
-        st.warning("Os times foram identificados, mas nenhum jogo pôde ser extraído. Verifique se o texto colado tem a mesma estrutura do arquivo .txt.")
+    texto_bloco_home = texto_completo[start_block_home:start_block_away]
+    texto_bloco_away = texto_completo[start_block_away:]
 
-    return home_team, away_team, df_jogos
+    # A função corrigida é chamada aqui para cada bloco de texto
+    df_home_jogos = extrair_jogos_corrigida(texto_bloco_home)
+    df_away_jogos = extrair_jogos_corrigida(texto_bloco_away)
+
+    if df_home_jogos.empty or df_away_jogos.empty:
+        st.warning(
+            "Um ou ambos os times foram identificados, mas os jogos não puderam ser extraídos. Verifique o formato dos dados.")
+
+    return home_team_official, away_team_official, df_home_jogos, df_away_jogos
